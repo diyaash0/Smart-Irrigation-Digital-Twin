@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Irrigation Digital Twin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; }
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+    </style>
+</head>
+<body class="p-6">
+    <div class="max-w-7xl mx-auto space-y-6">
+        <!-- Header -->
+        <header class="flex justify-between items-center glass-panel p-6">
+            <div>
+                <h1 class="text-3xl font-bold text-emerald-400">IoT Smart Irrigation</h1>
+                <p class="text-slate-400 text-sm mt-1">Digital Twin & Machine Learning Monitor</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="w-3 h-3 rounded-full bg-emerald-500 pulse"></span>
+                <span class="text-slate-300 font-semibold text-sm">MQTT Broker: Connected</span>
+            </div>
+        </header>
+
+        <!-- Top Widgets -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div class="glass-panel p-6 flex flex-col justify-between">
+                <h3 class="text-slate-400 font-semibold mb-2 text-sm uppercase tracking-wider">Soil Moisture</h3>
+                <div class="text-4xl font-bold text-blue-400" id="ui-moisture">--%</div>
+            </div>
+            <div class="glass-panel p-6 flex flex-col justify-between">
+                <h3 class="text-slate-400 font-semibold mb-2 text-sm uppercase tracking-wider">Field Temp</h3>
+                <div class="text-4xl font-bold text-orange-400" id="ui-temp">--°C</div>
+            </div>
+            <div class="glass-panel p-6 flex flex-col justify-between">
+                <h3 class="text-slate-400 font-semibold mb-2 text-sm uppercase tracking-wider">Rain Probability</h3>
+                <div class="text-4xl font-bold text-cyan-400" id="ui-rain">--%</div>
+            </div>
+            <div class="glass-panel p-6 flex flex-col justify-between border-2 border-emerald-500/30">
+                <h3 class="text-emerald-400 font-semibold mb-2 text-sm uppercase tracking-wider">Pump Status</h3>
+                <div class="text-2xl font-bold text-white" id="ui-pump">STANDBY</div>
+            </div>
+        </div>
+
+        <!-- ML Insights & Chart -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- ML Log -->
+            <div class="glass-panel p-6 col-span-1 md:col-span-1 border-l-4 border-indigo-500">
+                <h2 class="text-xl font-bold text-indigo-400 mb-4 flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    ML Brain Insights
+                </h2>
+                <div class="space-y-4">
+                    <div>
+                        <p class="text-slate-400 text-sm">AI Recommendation:</p>
+                        <p id="ml-reason" class="text-lg font-semibold text-white mt-1">Waiting for data...</p>
+                    </div>
+                    <div>
+                        <p class="text-slate-400 text-sm">Calculated Duration:</p>
+                        <p id="ml-duration" class="text-2xl font-bold text-emerald-400 mt-1">0 Minutes</p>
+                    </div>
+                    <div>
+                        <p class="text-slate-400 text-sm">Model Confidence:</p>
+                        <div class="w-full bg-slate-700 rounded-full h-2.5 mt-2">
+                            <div id="ml-confidence-bar" class="bg-indigo-500 h-2.5 rounded-full" style="width: 0%"></div>
+                        </div>
+                        <p id="ml-confidence-text" class="text-xs text-slate-500 text-right mt-1">0%</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Graph -->
+            <div class="glass-panel p-6 col-span-1 md:col-span-2">
+                <h2 class="text-xl font-bold text-white mb-4">Live Telemetry (MQTT Stream)</h2>
+                <div class="h-64 w-full">
+                    <canvas id="telemetryChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Setup Chart
+        const ctx = document.getElementById('telemetryChart').getContext('2d');
+        const telemetryChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    { label: 'Soil Moisture (%)', borderColor: '#3b82f6', backgroundColor: '#3b82f633', data: [], tension: 0.4, fill: true },
+                    { label: 'Temperature (°C)', borderColor: '#f97316', backgroundColor: 'transparent', data: [], tension: 0.4 }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                color: '#94a3b8',
+                scales: {
+                    x: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
+                    y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }
+                },
+                plugins: { legend: { labels: { color: '#e2e8f0' } } }
+            }
+        });
+
+        // Polling Data from Flask API
+        async function updateDashboard() {
+            try {
+                const response = await fetch('/api/live_data');
+                const data = await response.json();
+
+                if(data.moisture > 0) {
+                    // Update Top Widgets
+                    document.getElementById('ui-moisture').innerText = data.moisture.toFixed(1) + '%';
+                    document.getElementById('ui-temp').innerText = data.temperature.toFixed(1) + '°C';
+                    
+                    if(data.weather) {
+                        document.getElementById('ui-rain').innerText = data.weather.rain_probability + '%';
+                    }
+
+                    // Update ML Insights
+                    if(data.predictions) {
+                        document.getElementById('ml-reason').innerText = data.predictions.reason;
+                        document.getElementById('ml-duration').innerText = data.predictions.duration_minutes + ' Minutes';
+                        
+                        document.getElementById('ml-confidence-text').innerText = (data.predictions.confidence * 100).toFixed(0) + '%';
+                        document.getElementById('ml-confidence-bar').style.width = (data.predictions.confidence * 100) + '%';
+
+                        const pumpStatus = data.predictions.needs_water ? 'PUMPING' : 'STANDBY';
+                        const pumpEl = document.getElementById('ui-pump');
+                        pumpEl.innerText = pumpStatus;
+                        if(data.predictions.needs_water) {
+                            pumpEl.classList.add('text-blue-400'); pumpEl.classList.remove('text-white');
+                        } else {
+                            pumpEl.classList.remove('text-blue-400'); pumpEl.classList.add('text-white');
+                        }
+                    }
+
+                    // Update Chart
+                    const now = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+                    if(telemetryChart.data.labels.length > 20) {
+                        telemetryChart.data.labels.shift();
+                        telemetryChart.data.datasets[0].data.shift();
+                        telemetryChart.data.datasets[1].data.shift();
+                    }
+                    telemetryChart.data.labels.push(now);
+                    telemetryChart.data.datasets[0].data.push(data.moisture);
+                    telemetryChart.data.datasets[1].data.push(data.temperature);
+                    telemetryChart.update();
+                }
+
+            } catch(e) { console.error("Error fetching live data", e); }
+        }
+
+        // Poll every 2 seconds
+        setInterval(updateDashboard, 2000);
+    </script>
+</body>
+</html>
